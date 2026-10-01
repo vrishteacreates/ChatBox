@@ -1,11 +1,12 @@
 import streamlit as st
 import sqlite3
 from datetime import datetime
-import time
+from streamlit_autorefresh import st_autorefresh
 
-# ============================================================
-# PAGE CONFIG
-# ============================================================
+
+# =========================================================
+# PAGE SETTINGS
+# =========================================================
 
 st.set_page_config(
     page_title="ChatBox",
@@ -16,9 +17,9 @@ st.set_page_config(
 DB_NAME = "chatbox.db"
 
 
-# ============================================================
-# DATABASE
-# ============================================================
+# =========================================================
+# DATABASE CONNECTION
+# =========================================================
 
 def get_connection():
     return sqlite3.connect(
@@ -27,12 +28,16 @@ def get_connection():
     )
 
 
+# =========================================================
+# CREATE DATABASE TABLES
+# =========================================================
+
 def create_database():
 
     conn = get_connection()
     cursor = conn.cursor()
 
-    # Messages
+    # Messages table
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS messages (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -43,7 +48,7 @@ def create_database():
         )
     """)
 
-    # Read receipts
+    # Seen/read receipts table
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS message_views (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -57,6 +62,10 @@ def create_database():
     conn.commit()
     conn.close()
 
+
+# =========================================================
+# SAVE MESSAGE
+# =========================================================
 
 def save_message(username, message="", sticker=""):
 
@@ -82,6 +91,10 @@ def save_message(username, message="", sticker=""):
     conn.close()
 
 
+# =========================================================
+# GET ALL MESSAGES
+# =========================================================
+
 def get_messages():
 
     conn = get_connection()
@@ -105,6 +118,10 @@ def get_messages():
     return data
 
 
+# =========================================================
+# MARK MESSAGES AS SEEN
+# =========================================================
+
 def mark_seen(username):
 
     conn = get_connection()
@@ -118,7 +135,7 @@ def mark_seen(username):
 
     for message_id, sender, message, sticker, timestamp in messages:
 
-        # Don't mark your own messages
+        # Don't mark your own messages as seen
         if sender != username:
 
             cursor.execute("""
@@ -134,6 +151,10 @@ def mark_seen(username):
     conn.commit()
     conn.close()
 
+
+# =========================================================
+# GET USERS WHO HAVE SEEN A MESSAGE
+# =========================================================
 
 def get_seen_users(message_id):
 
@@ -157,6 +178,10 @@ def get_seen_users(message_id):
     return users
 
 
+# =========================================================
+# GET GROUP MEMBERS
+# =========================================================
+
 def get_members():
 
     conn = get_connection()
@@ -178,12 +203,16 @@ def get_members():
     return users
 
 
+# =========================================================
+# CREATE DATABASE
+# =========================================================
+
 create_database()
 
 
-# ============================================================
+# =========================================================
 # CUSTOM CSS
-# ============================================================
+# =========================================================
 
 st.markdown("""
 <style>
@@ -232,9 +261,9 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 
-# ============================================================
-# LOGIN / USERNAME
-# ============================================================
+# =========================================================
+# USERNAME LOGIN
+# =========================================================
 
 if "username" not in st.session_state:
 
@@ -279,9 +308,9 @@ if "username" not in st.session_state:
     st.stop()
 
 
-# ============================================================
-# HEADER
-# ============================================================
+# =========================================================
+# CHATBOX HEADER
+# =========================================================
 
 st.markdown(
     '<div class="main-title">💬 ChatBox</div>',
@@ -293,30 +322,51 @@ st.markdown(
     unsafe_allow_html=True
 )
 
+
+# =========================================================
+# CURRENT USER
+# =========================================================
+
 st.markdown(
     f"""
     <div class="user-box">
-        👤 You are chatting as <b>{st.session_state.username}</b>
+        👤 You are chatting as
+        <b>{st.session_state.username}</b>
     </div>
     """,
     unsafe_allow_html=True
 )
 
 
-# ============================================================
-# MARK OTHER PEOPLE'S MESSAGES AS SEEN
-# ============================================================
+# =========================================================
+# AUTO REFRESH EVERY 5 SECONDS
+# =========================================================
+
+st_autorefresh(
+    interval=5000,
+    key="chat_refresh"
+)
+
+
+# =========================================================
+# MARK MESSAGES AS SEEN
+# =========================================================
 
 mark_seen(
     st.session_state.username
 )
 
 
-# ============================================================
-# DISPLAY MESSAGES
-# ============================================================
+# =========================================================
+# LOAD MESSAGES
+# =========================================================
 
 messages = get_messages()
+
+
+# =========================================================
+# DISPLAY MESSAGES
+# =========================================================
 
 if not messages:
 
@@ -334,9 +384,9 @@ else:
         timestamp
     ) in messages:
 
-        # ----------------------------------------------------
+        # -------------------------------------------------
         # YOUR MESSAGE
-        # ----------------------------------------------------
+        # -------------------------------------------------
 
         if username == st.session_state.username:
 
@@ -345,9 +395,7 @@ else:
                 avatar="🧑"
             ):
 
-                st.markdown(
-                    f"**You**"
-                )
+                st.markdown("**You**")
 
                 if sticker:
 
@@ -360,9 +408,7 @@ else:
 
                     st.write(message)
 
-                st.caption(
-                    timestamp
-                )
+                st.caption(timestamp)
 
                 seen_users = get_seen_users(
                     message_id
@@ -381,10 +427,9 @@ else:
                         "✓ Sent"
                     )
 
-
-        # ----------------------------------------------------
-        # OTHER USER
-        # ----------------------------------------------------
+        # -------------------------------------------------
+        # OTHER USER'S MESSAGE
+        # -------------------------------------------------
 
         else:
 
@@ -408,16 +453,19 @@ else:
 
                     st.write(message)
 
-                st.caption(
-                    timestamp
-                )
+                st.caption(timestamp)
 
 
-# ============================================================
-# STICKERS
-# ============================================================
+# =========================================================
+# DIVIDER
+# =========================================================
 
 st.divider()
+
+
+# =========================================================
+# STICKERS
+# =========================================================
 
 st.subheader("😄 Stickers")
 
@@ -452,9 +500,9 @@ for i, sticker in enumerate(stickers):
             st.rerun()
 
 
-# ============================================================
+# =========================================================
 # GROUP MEMBERS
-# ============================================================
+# =========================================================
 
 with st.expander("👥 Group Members"):
 
@@ -483,9 +531,9 @@ with st.expander("👥 Group Members"):
         )
 
 
-# ============================================================
-# MESSAGE INPUT
-# ============================================================
+# =========================================================
+# CHAT INPUT
+# =========================================================
 
 message = st.chat_input(
     "Type your message..."
